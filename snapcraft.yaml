@@ -1,0 +1,24 @@
+name: gce-cleaner
+version: 1.0
+summary: Basic snap used to clean machines on gce
+description: Basic snap used to clean machines on gce
+confinement: strict
+grade: stable
+
+apps:
+    runner:
+        command: cleaner
+        daemon: simple
+        plugs: [network, mount-observe, home]
+        passthrough:
+            # Run every 15 minutes
+            timer: 0:00-24:00/96
+
+parts:
+    deps:
+        plugin: python
+        python-packages: [google-api-python-client, python-dateutil]
+        source: .
+    copy:
+        plugin: dump
+        source: .

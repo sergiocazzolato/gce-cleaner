@@ -1,0 +1,66 @@
+#! /usr/bin/env python3
+
+from datetime import datetime, timezone
+from dateutil.parser import parse
+import googleapiclient.discovery
+import time
+
+PROJECT = 'computeengine'
+ZONE = 'us-east1-b'
+THRESHOLD = 120
+
+
+def list_instances(compute):
+    result = compute.instances().list(project=PROJECT, zone=ZONE).execute()
+    return result['items']
+
+
+def get_creation_timestamp(instance):
+    return parse(instance.get('creationTimestamp'))
+
+
+def delete_instance(compute, name):
+    return compute.instances().delete(
+        project=PROJECT,
+        zone=ZONE,
+        instance=name).execute()
+
+
+def wait_for_operation(compute, operation):
+    while True:
+        result = compute.zoneOperations().get(
+            project=PROJECT,
+            zone=ZONE,
+            operation=operation).execute()
+
+        if result['status'] == 'DONE':
+            print("done.")
+            if 'error' in result:
+                raise Exception(result['error'])
+            return result
+
+        time.sleep(1)
+
+
+def main():
+    compute = googleapiclient.discovery.build('compute', 'v1')
+    instances = list_instances(compute)
+
+    now = datetime.now(timezone.utc)
+    for instance in instances:
+        instance_name = instance.get('name')
+        print('Checking instance: {}'.format(instance_name))
+        creation_time = get_creation_timestamp(instance)
+        print('Instance creation time: {}'.format(creation_time))
+        elapsed_time = now - creation_time
+        print('Seconds running: {}'.format(elapsed_time.total_seconds()))
+        minutes_running = elapsed_time.total_seconds() / 60
+        print('Minutes running: {}'.format(minutes_running))
+        if minutes_running > THRESHOLD:
+            print('Deleting instance: {}, running longer than threshold: {}'.format(instance_name, THRESHOLD))
+            operation = delete_instance(compute, instance_name)
+            wait_for_operation(compute, operation['name'])
+
+
+if __name__ == '__main__':
+    main()
