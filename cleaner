@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from dateutil.parser import parse
 import googleapiclient.discovery
+import socket
 import time
 
 PROJECT = 'computeengine'
@@ -42,14 +43,26 @@ def wait_for_operation(compute, operation):
         time.sleep(1)
 
 
+def get_hostname():
+    return socket.gethostname()
+
+
 def main():
     compute = googleapiclient.discovery.build('compute', 'v1')
     instances = list_instances(compute)
+
+    current_name = get_hostname()
+    print('Current instance: {}'.format(current_name))
 
     now = datetime.now(timezone.utc)
     for instance in instances:
         instance_name = instance.get('name')
         print('Checking instance: {}'.format(instance_name))
+
+        # This will only work on gce where we need to avoid the current instance is killed
+        if current_name is instance_name:
+            print('Skipping current instance}')
+            continue
 
         creation_time = get_creation_timestamp(instance)
         print('Instance creation time: {}'.format(creation_time))
