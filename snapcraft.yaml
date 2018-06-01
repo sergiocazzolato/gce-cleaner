@@ -1,5 +1,5 @@
 name: gce-cleaner
-version: 1.0
+version: 1.0.4
 summary: Basic snap used to clean machines on gce
 description: Basic snap used to clean machines on gce
 confinement: strict

@@ -2,13 +2,18 @@
 
 from datetime import datetime, timezone
 from dateutil.parser import parse
+import getpass
 import googleapiclient.discovery
+import os
 import socket
 import time
 
 PROJECT = 'computeengine'
 ZONE = 'us-east1-b'
-THRESHOLD = 120
+TIMEOUT_KEY = 'halt-timeout'
+
+TIMEOUT_DEFAULT = 120 # this timeout is used by default and it is expressed on minutes
+TIME_UNITS = {'m': 1, 'h': 60, 'd': 1440} # allowed time units and conversion to minutes
 
 
 def list_instances(compute):
@@ -28,53 +33,107 @@ def delete_instance(compute, name):
 
 
 def wait_for_operation(compute, operation):
-    while True:
+    for i in range(1, 60):
         result = compute.zoneOperations().get(
             project=PROJECT,
             zone=ZONE,
             operation=operation).execute()
 
         if result.get('status') == 'DONE':
-            print('Operation done')
+            print('Operation done with the result: {}'.format(result))
             if 'error' in result:
                 raise Exception(result.get('error'))
             return result
 
-        time.sleep(1)
+        print('Waiting until operation is done: attempt {}'.format(i))
+        time.sleep(2)
 
 
 def get_hostname():
     return socket.gethostname()
 
 
+def time_expression_to_minutes(expression):
+    if not expression or len(expression) < 2:
+        print('Invalid expression, time and unit are expected, using default timeout')
+        return TIMEOUT_DEFAULT
+
+    unit = expression[-1]
+    count = expression[:-1]
+
+    if unit not in TIME_UNITS.keys():
+        print('Invalid time unit {}, using default timeout'.format(unit))
+        return TIMEOUT_DEFAULT
+
+    try:
+        return int(count) * TIME_UNITS.get(unit)
+    except:
+        print('Invalid count {}, using default timeout'.format(count))
+        return TIMEOUT_DEFAULT
+
+
+def set_credentials_path():
+    if not os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', ''):
+        user = getpass.getuser()
+        if user == 'root':
+            home = os.path.join('/', user)
+        else:
+            home = os.path.join('/', 'home', user)
+
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.path.join(
+            home, '.config', 'gcloud', 'application_default_credentials.json')
+        print('reading credentials from: {}'.format(os.environ['GOOGLE_APPLICATION_CREDENTIALS']))
+
+
 def main():
+    # Get credentials from the environment and config the gcloud client
+    set_credentials_path()
     compute = googleapiclient.discovery.build('compute', 'v1')
     instances = list_instances(compute)
+    operations = []
 
+    # Get current hostname used to avoid auto-kill the gce cleaner
     current_name = get_hostname()
     print('Current instance: {}'.format(current_name))
+    print('------------------------------------------')
 
+    # Iterate over all the running instances
     now = datetime.now(timezone.utc)
     for instance in instances:
         instance_name = instance.get('name')
         print('Checking instance: {}'.format(instance_name))
 
         # This will only work on gce where we need to avoid the current instance is killed
-        if current_name is instance_name:
-            print('Skipping current instance}')
+        if current_name == instance_name:
+            print('Skipping current instance')
             continue
 
+        # Get instance creation time
         creation_time = get_creation_timestamp(instance)
         print('Instance creation time: {}'.format(creation_time))
 
+        # Calculate running time for the instance
         elapsed_time = now - creation_time
         minutes_running = elapsed_time.total_seconds() / 60
         print('Minutes running: {}'.format(minutes_running))
 
-        if minutes_running > THRESHOLD:
-            print('Deleting instance: {}, running longer than threshold: {}'.format(instance_name, THRESHOLD))
+        # Get the timeout in minutes for the instance
+        timeout_expression = instance.get('labels').get(TIMEOUT_KEY)
+        instance_timeout_mins = time_expression_to_minutes(timeout_expression)
+        print('Instance timeout on minutes: {}'.format(instance_timeout_mins))
+
+        # Delete the instances which are running more than de timeout
+        if minutes_running > instance_timeout_mins:
+            print('Deleting instance: {}, running longer than threshold: {}'.format(
+                instance_name, instance_timeout_mins))
             operation = delete_instance(compute, instance_name)
-            wait_for_operation(compute, operation.get('name'))
+            operations.append(operation)
+
+        print('------------------------------------------')
+
+    # Iterate operations and until are done
+    for operation in operations:
+        wait_for_operation(compute, operation.get('name'))
 
 
 if __name__ == '__main__':
