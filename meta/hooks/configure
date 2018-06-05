@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# get config values
+zone=$(snapctl get zone)
+project=$(snapctl get project)
+timeout=$(snapctl get timeout)
+haltkey=$(snapctl get haltkey)
+credentials=$(snapctl get credentials)
+
+# fill with default values
+[ -z $zone ] && zone=us-east1-b
+[ -z $project ] && project=computeengine
+[ -z $timeout ] && timeout=120
+[ -z $haltkey ] && haltkey=halt-timeout
+[ -z $credentials ] && credentials="$SNAP_COMMON/application_default_credentials.json"
+
+# write config ini file
+cat <<-EOF > "$SNAP_COMMON/config.ini"
+[DEFAULT]
+zone = $zone
+project = $project
+timeout = $timeout
+haltkey = $haltkey
+credentials = $credentials
+EOF

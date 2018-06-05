@@ -1,18 +1,20 @@
 #! /usr/bin/env python3
 
+import configparser
 from datetime import datetime, timezone
 from dateutil.parser import parse
 import getpass
 import googleapiclient.discovery
 import os
 import socket
+import subprocess
 import time
 
-PROJECT = 'computeengine'
-ZONE = 'us-east1-b'
-TIMEOUT_KEY = 'halt-timeout'
-
-TIMEOUT_DEFAULT = 120 # this timeout is used by default and it is expressed on minutes
+PROJECT = None
+ZONE = None
+TIMEOUT = None
+TIMEOUT_KEY = None
+CREDENTIALS = None
 TIME_UNITS = {'m': 1, 'h': 60, 'd': 1440} # allowed time units and conversion to minutes
 
 
@@ -56,36 +58,44 @@ def get_hostname():
 def time_expression_to_minutes(expression):
     if not expression or len(expression) < 2:
         print('Invalid expression, time and unit are expected, using default timeout')
-        return TIMEOUT_DEFAULT
+        return TIMEOUT
 
     unit = expression[-1]
     count = expression[:-1]
 
     if unit not in TIME_UNITS.keys():
         print('Invalid time unit {}, using default timeout'.format(unit))
-        return TIMEOUT_DEFAULT
+        return TIMEOUT
 
     try:
         return int(count) * TIME_UNITS.get(unit)
     except:
         print('Invalid count {}, using default timeout'.format(count))
-        return TIMEOUT_DEFAULT
+        return TIMEOUT
 
 
 def set_credentials_path():
-    if not os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', ''):
-        user = getpass.getuser()
-        if user == 'root':
-            home = os.path.join('/', user)
-        else:
-            home = os.path.join('/', 'home', user)
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = CREDENTIALS
+    print('reading credentials from: {}'.format(os.environ['GOOGLE_APPLICATION_CREDENTIALS']))
 
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.path.join(
-            home, '.config', 'gcloud', 'application_default_credentials.json')
-        print('reading credentials from: {}'.format(os.environ['GOOGLE_APPLICATION_CREDENTIALS']))
+
+def set_global_configuration():
+    config_file = os.path.join(os.environ.get('SNAP_COMMON'), 'config.ini')
+    config = configparser.ConfigParser()
+    config.read(config_file)
+
+    global PROJECT, ZONE, TIMEOUT, TIMEOUT_KEY, CREDENTIALS
+    PROJECT = config.get('DEFAULT', 'project')
+    ZONE = config.get('DEFAULT', 'zone')
+    TIMEOUT = config.getint('DEFAULT', 'timeout')
+    TIMEOUT_KEY = config.get('DEFAULT', 'haltkey')
+    CREDENTIALS = config.get('DEFAULT', 'credentials')
 
 
 def main():
+    # Read config file and set global variables
+    set_global_configuration()
+
     # Get credentials from the environment and config the gcloud client
     set_credentials_path()
     compute = googleapiclient.discovery.build('compute', 'v1')

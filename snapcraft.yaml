@@ -1,5 +1,5 @@
 name: gce-cleaner
-version: 1.0.4
+version: 1.0.5
 summary: Basic snap used to clean machines on gce
 description: Basic snap used to clean machines on gce
 confinement: strict
@@ -9,7 +9,7 @@ apps:
     runner:
         command: cleaner
         daemon: simple
-        plugs: [network, mount-observe, home]
+        plugs: [network]
         passthrough:
             # Run every 15 minutes
             timer: 0:00-24:00/96
