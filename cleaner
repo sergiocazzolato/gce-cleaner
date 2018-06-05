@@ -7,7 +7,6 @@ import getpass
 import googleapiclient.discovery
 import os
 import socket
-import subprocess
 import time
 
 PROJECT = None
