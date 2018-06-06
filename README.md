@@ -21,3 +21,13 @@ It is possible to configure some parameters for the snap by using snapctl:
 * timeout = the timeout used to delete the instances measured in minutes (default: 120)
 * haltkey = the key used to determine the timeout for the specific instance (default: halt-timeout)
 * credentials = the path to the google credentials used to list/remove instances (default: $SNAP_COMMON/application_default_credentials.json)
+
+## Deploy with Spread
+
+There is a spread task to make the automatic deployment of the gce-cleaner into a google instance.
+
+Before running the spread task, it is required to have in the project path a file called sa.json with the appropiated service account credentials. Those credentials will be used to connect the snap to the gce project.
+
+Use the following command to run the spread task:
+
+> spread -reuse google:ubuntu-16.04-64:tasks/deploy
