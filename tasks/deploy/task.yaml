@@ -5,7 +5,8 @@ description: Install the snap and configure the it to start the cleaner
 systems: [ubuntu-16.04-64]
 
 execute: |
+    snap install core --beta
     snap install gce-cleaner --beta
 
     cp "$"PROJECT_PATH/sa.json" /var/snap/gce-cleaner/common/sa.json
-    snapctl gce-cleaner set credentials /var/snap/gce-cleaner/common/sa.json
+    snap set gce-cleaner credentials=/var/snap/gce-cleaner/common/sa.json
