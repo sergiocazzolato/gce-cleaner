@@ -8,5 +8,5 @@ execute: |
     snap install core --beta
     snap install gce-cleaner --beta
 
-    cp "$"PROJECT_PATH/sa.json" /var/snap/gce-cleaner/common/sa.json
+    cp "$PROJECT_PATH/sa.json" /var/snap/gce-cleaner/common/sa.json
     snap set gce-cleaner credentials=/var/snap/gce-cleaner/common/sa.json
